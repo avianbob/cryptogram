@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cryptogram Puzzle</title>
+  <title>Mobile Cryptogram Puzzle</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -28,7 +28,11 @@
       font-size: 24px;
     }
     #cryptogram {
-      margin: 40px 0;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+      margin: 20px 0;
       text-align: center;
       line-height: 2.2;
     }
@@ -40,9 +44,29 @@
       margin: 0 4px;
       text-align: center;
       font-size: 24px;
+      vertical-align: bottom;
+      padding-bottom: 5px;
+      position: relative;
+    }
+    .encrypted {
+      font-size: 12px;
+      position: absolute;
+      top: 40px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: #aaa;
+    }
+    .active {
+      border-bottom: 2px solid red; /* Red underline for active blanks */
     }
     .filled {
-      color: red;
+      border-bottom: none;
+      color: white;
+    }
+    .space {
+      width: 20px;
+      display: inline-block;
     }
     #keyboard {
       margin: 20px 0;
@@ -52,8 +76,8 @@
       gap: 10px;
     }
     #keyboard button {
-      width: 40px;
-      height: 40px;
+      width: 60px;
+      height: 50px;
       border-radius: 5px;
       border: none;
       background-color: #333;
@@ -61,7 +85,12 @@
       font-size: 18px;
       cursor: pointer;
     }
-    #keyboard button:hover {
+    #keyboard button:disabled {
+      background-color: #d9534f;
+      color: #fff;
+      cursor: not-allowed;
+    }
+    #keyboard button:hover:enabled {
       background-color: #555;
     }
     #actions {
@@ -80,6 +109,19 @@
     #actions button:hover {
       background-color: #c9302c;
     }
+    /* Mobile-Responsive Styling */
+    @media (max-width: 600px) {
+      #keyboard button {
+        width: 45px;
+        height: 45px;
+        font-size: 16px;
+      }
+      .hiddenLetter {
+        width: 20px;
+        height: 25px;
+        font-size: 20px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -90,12 +132,7 @@
   </div>
 
   <div id="cryptogram">
-    <!-- Cryptogram letters (hidden with blanks) -->
-    <span class="hiddenLetter" data-letter="D">_</span>
-    <span class="hiddenLetter">H</span>
-    <span class="hiddenLetter">N</span>
-    <span class="hiddenLetter">_</span>
-    <!-- More cryptogram letters -->
+    <!-- Cryptogram letters (hidden with blanks and encrypted codes) -->
   </div>
 
   <div id="keyboard">
@@ -103,25 +140,31 @@
   </div>
 
   <div id="actions">
-    <button id="backspace">⌫</button>
-    <button id="clear">✖</button>
-    <button id="submit">✔</button>
+    <button id="backspace">⌫ Backspace</button>
+    <button id="clear">✖ Clear All</button>
   </div>
 
   <script>
-    const originalPhrase = "DON'T CRY BECAUSE IT'S OVER, SMILE BECAUSE IT HAPPENED.";
-    const revealedLetters = ['D', 'S', 'O', 'E'];  // Example of pre-filled letters
+    const originalPhrase = "DO SOMETHING ELSE";
+    const encryptedLetters = ['K', 'P', 'Z', 'L', 'Q', 'R', 'W', 'S', 'X', 'C', 'V']; // Random letters for encryption
+    const revealedLetters = ['D', 'O', 'E'];  // Pre-filled letters
+    const inputLetters = [];  // Store input letters for backspace functionality
 
     function generateCryptogram() {
       const cryptogramDiv = document.getElementById("cryptogram");
       cryptogramDiv.innerHTML = '';
+      let index = 0;
       for (let char of originalPhrase.toUpperCase()) {
-        if (revealedLetters.includes(char)) {
-          cryptogramDiv.innerHTML += `<span class="hiddenLetter">${char}</span>`;
-        } else if (char === ' ') {
-          cryptogramDiv.innerHTML += `<span>&nbsp;&nbsp;</span>`;
+        if (char === ' ') {
+          cryptogramDiv.innerHTML += `<span class="space">&nbsp;</span>`;
         } else {
-          cryptogramDiv.innerHTML += `<span class="hiddenLetter" data-letter="${char}">_</span>`;
+          const encrypted = encryptedLetters[index % encryptedLetters.length];  // Use encrypted letters only
+          if (revealedLetters.includes(char)) {
+            cryptogramDiv.innerHTML += `<span class="hiddenLetter filled" data-letter="${char}">${char}<span class="encrypted">${encrypted}</span></span>`;
+          } else {
+            cryptogramDiv.innerHTML += `<span class="hiddenLetter" data-letter="${char}" id="blank-${index}">_ <span class="encrypted">${encrypted}</span></span>`;
+          }
+          index++;
         }
       }
     }
@@ -132,38 +175,99 @@
       alphabet.forEach(letter => {
         const button = document.createElement('button');
         button.innerText = letter;
-        button.onclick = () => insertLetter(letter);
+        button.onclick = () => insertLetter(letter, button);
+        if (revealedLetters.includes(letter)) {
+          button.disabled = true;  // Disable revealed letters
+        }
         keyboardDiv.appendChild(button);
       });
     }
 
-    function insertLetter(letter) {
-      const blanks = document.querySelectorAll('.hiddenLetter');
-      for (let blank of blanks) {
-        if (blank.innerText === '_') {
-          blank.innerText = letter;
-          if (blank.getAttribute('data-letter') === letter) {
+    function insertLetter(letter, button) {
+      const blanks = document.querySelectorAll(`.hiddenLetter[data-letter="${letter}"]`);
+      if (blanks.length > 0) {
+        blanks.forEach(blank => {
+          if (blank.innerText === '_') {
+            blank.innerText = letter;
             blank.classList.add('filled');
+            inputLetters.push({ blank, letter });  // Track the filled letter
           }
-          break;
+        });
+        button.disabled = true; // Disable the letter button after it's used
+      } else {
+        // Wrong letter entered
+        alert(`You can only input the correct letter: ${letter}`);
+      }
+    }
+
+    function highlightBlanks(letter) {
+      const allBlanks = document.querySelectorAll('.hiddenLetter');
+      allBlanks.forEach(blank => {
+        blank.classList.remove('active');
+      });
+
+      const activeBlanks = document.querySelectorAll(`.hiddenLetter[data-letter="${letter}"]`);
+      activeBlanks.forEach(blank => {
+        blank.classList.add('active');
+      });
+    }
+
+    function clearHighlight() {
+      const allBlanks = document.querySelectorAll('.hiddenLetter');
+      allBlanks.forEach(blank => {
+        blank.classList.remove('active');
+      });
+    }
+
+    function backspaceLetter() {
+      if (inputLetters.length > 0) {
+        const { blank, letter } = inputLetters.pop();
+        blank.innerText = '_';
+        blank.classList.remove('filled');
+        clearHighlight();
+
+        // Enable the keyboard button again
+        const buttons = document.querySelectorAll('#keyboard button');
+        for (let btn of buttons) {
+          if (btn.innerText === letter) {
+            btn.disabled = false;
+            break;
+          }
         }
       }
     }
 
-    function backspaceLetter() {
-      const filledLetters = document.querySelectorAll('.hiddenLetter.filled');
-      if (filledLetters.length > 0) {
-        const lastFilled = filledLetters[filledLetters.length - 1];
-        lastFilled.innerText = '_';
-        lastFilled.classList.remove('filled');
-      }
+    function clearAll() {
+      inputLetters.forEach(({ blank, letter }) => {
+        blank.innerText = '_';
+        blank.classList.remove('filled');
+        clearHighlight();
+
+        // Re-enable corresponding keyboard buttons
+        const buttons = document.querySelectorAll('#keyboard button');
+        buttons.forEach(btn => {
+          if (btn.innerText === letter) {
+            btn.disabled = false;
+          }
+        });
+      });
+      inputLetters.length = 0;  // Clear the input history
     }
 
     document.getElementById("backspace").addEventListener("click", backspaceLetter);
-    document.getElementById("clear").addEventListener("click", generateCryptogram);
+    document.getElementById("clear").addEventListener("click", clearAll);
 
     generateCryptogram();
     createKeyboard();
+
+    // Add event listener to blanks to highlight them
+    const cryptogramDiv = document.getElementById("cryptogram");
+    cryptogramDiv.addEventListener('click', (event) => {
+      if (event.target.classList.contains('hiddenLetter')) {
+        const letter = event.target.getAttribute('data-letter');
+        highlightBlanks(letter);
+      }
+    });
   </script>
 </body>
 </html>
