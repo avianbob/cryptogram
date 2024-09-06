@@ -53,13 +53,16 @@
       margin: 20px 0;
       text-align: center;
       line-height: 2.2;
-      gap: 0px; /* Adjusts spacing between each cryptogram letter block */
-      word-wrap: break-word; /* Ensure long words wrap */    }
+      gap: 10px; /* Adjusts spacing between each cryptogram letter block */
+      word-wrap: break-word; /* Ensure long words wrap */    
+    }
     .hiddenLetter {
       border-bottom: 2px solid white;
-      display: inline-block;
+      display: inline-flex;
+      flex-direction: column;
+      justify-content: center;
       width: 25px;
-      height: 30px;
+      height: 50px; /* Adjust height to avoid overlap */
       margin: 0 4px;
       text-align: center;
       font-size: 24px;
@@ -74,11 +77,7 @@
     }
     .encrypted {
       font-size: 12px;
-      position: absolute;
-      top: 40px;
-      left: 0;
-      right: 0;
-      text-align: center;
+      margin-top: 5px; /* Adjust spacing */
       color: #aaa;
     }
     .active {
@@ -141,11 +140,15 @@
       }
       .hiddenLetter {
         width: 20px;
-        height: 25px;
+        height: 40px; /* Reduce height for mobile */
         font-size: 20px;
       }
       #cryptogram {
         white-space: normal; /* Allows words to wrap in mobile view */
+        gap: 8px; /* Adjust the spacing between letters for mobile */
+      }
+      .encrypted {
+        margin-top: 4px; /* Adjust the spacing for mobile */
       }
     }
   </style>
@@ -231,112 +234,68 @@
     function enableKeyboard() {
       const buttons = document.querySelectorAll('#keyboard button');
       buttons.forEach(button => {
-        if (!questions[currentQuestionIndex].revealed.includes(button.innerText) && !inputLetters.some(input => input.letter === button.innerText)) {
-          button.disabled = false;
-        }
-      });
-    }
-
-    function disableKeyboard() {
-      const buttons = document.querySelectorAll('#keyboard button');
-      buttons.forEach(button => {
-        button.disabled = true;
+        button.disabled = false;
       });
     }
 
     function insertLetter(letter) {
       if (selectedEncryptedLetter) {
-        const matchingBlanks = document.querySelectorAll(`.hiddenLetter[data-encrypted="${selectedEncryptedLetter}"]:not(.filled)`);
-        matchingBlanks.forEach(blank => {
-          blank.innerHTML = `${letter}<span class="encrypted">${blank.getAttribute('data-encrypted')}</span>`;
-          blank.classList.add('filled');
-          inputLetters.push({ blank, letter });
-        });
-
-        const button = [...document.querySelectorAll('#keyboard button')].find(btn => btn.innerText === letter);
-        if (button) button.disabled = true;
-
-        clearHighlight();
+        const blank = selectedEncryptedLetter;
+        blank.innerHTML = `${letter}<span class="encrypted">${blank.dataset.encrypted}</span>`;
+        blank.classList.add('filled');
         selectedEncryptedLetter = null;
-        disableKeyboard();
       }
-    }
-
-    function highlightBlanks(encryptedLetter) {
-      const allBlanks = document.querySelectorAll('.hiddenLetter');
-      allBlanks.forEach(blank => blank.classList.remove('active'));
-
-      const matchingBlanks = document.querySelectorAll(`.hiddenLetter[data-encrypted="${encryptedLetter}"]`);
-      matchingBlanks.forEach(blank => blank.classList.add('active'));
-    }
-
-    function clearHighlight() {
-      const allBlanks = document.querySelectorAll('.hiddenLetter');
-      allBlanks.forEach(blank => blank.classList.remove('active'));
-    }
-
-    function backspaceLetter() {
-      if (selectedEncryptedLetter) {
-        const matchingBlanks = document.querySelectorAll(`.hiddenLetter[data-encrypted="${selectedEncryptedLetter}"]`);
-        matchingBlanks.forEach(blank => {
-          if (blank.classList.contains('filled')) {
-            const letter = blank.innerText.trim();
-            blank.innerHTML = `_ <span class="encrypted">${blank.getAttribute('data-encrypted')}</span>`;
-            blank.classList.remove('filled');
-
-            const button = [...document.querySelectorAll('#keyboard button')].find(btn => btn.innerText === letter);
-            if (button) button.disabled = false;
-
-            inputLetters = inputLetters.filter(input => input.blank !== blank);
-          }
-        });
-        selectedEncryptedLetter = null;
-        disableKeyboard();
-      }
-    }
-
-    function clearAll() {
-      inputLetters.forEach(input => {
-        input.blank.innerHTML = `_ <span class="encrypted">${input.blank.getAttribute('data-encrypted')}</span>`;
-        input.blank.classList.remove('filled');
-      });
-      inputLetters = [];
-      enableKeyboard();
-      clearHighlight();
-      selectedEncryptedLetter = null;
     }
 
     function addBlankListeners() {
-      const blanks = document.querySelectorAll('.hiddenLetter');
+      const blanks = document.querySelectorAll('.hiddenLetter:not(.filled)');
       blanks.forEach(blank => {
-        blank.addEventListener('click', () => {
-          clearHighlight();
-          selectedEncryptedLetter = blank.getAttribute('data-encrypted');
-          highlightBlanks(selectedEncryptedLetter);
+        blank.onclick = () => {
+          if (selectedEncryptedLetter) {
+            selectedEncryptedLetter.classList.remove('active');
+          }
+          blank.classList.add('active');
+          selectedEncryptedLetter = blank;
           enableKeyboard();
-        });
+        };
       });
     }
 
     function loadQuestion(index) {
       currentQuestionIndex = index;
-      inputLetters = [];
       generateCryptogram();
       createKeyboard();
-      highlightActiveQuestion();
+      disableCompletedLetters();
     }
 
-    function highlightActiveQuestion() {
-      const buttons = document.querySelectorAll('#questionButtons button');
-      buttons.forEach((button, index) => {
-        button.classList.toggle('activeQuestion', index === currentQuestionIndex);
+    function disableCompletedLetters() {
+      const revealed = questions[currentQuestionIndex].revealed;
+      revealed.forEach(letter => {
+        const button = document.querySelector(`#keyboard button[data-letter="${letter}"]`);
+        if (button) button.disabled = true;
       });
     }
 
-    loadQuestion(0);
+    document.getElementById('backspace').onclick = function () {
+      if (selectedEncryptedLetter) {
+        selectedEncryptedLetter.innerHTML = `_ <span class="encrypted">${selectedEncryptedLetter.dataset.encrypted}</span>`;
+        selectedEncryptedLetter.classList.remove('filled');
+        selectedEncryptedLetter = null;
+      }
+    };
 
-    document.getElementById('backspace').addEventListener('click', backspaceLetter);
-    document.getElementById('clear').addEventListener('click', clearAll);
+    document.getElementById('clear').onclick = function () {
+      const blanks = document.querySelectorAll('.hiddenLetter:not(.filled)');
+      blanks.forEach(blank => {
+        blank.innerHTML = `_ <span class="encrypted">${blank.dataset.encrypted}</span>`;
+        blank.classList.remove('filled');
+      });
+      selectedEncryptedLetter = null;
+    };
+
+    window.onload = function () {
+      loadQuestion(0);
+    };
   </script>
 </body>
 </html>
